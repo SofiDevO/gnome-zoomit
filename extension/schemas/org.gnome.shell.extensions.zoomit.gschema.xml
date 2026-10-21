@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.zoomit"
+          path="/org/gnome/shell/extensions/zoomit/">
+
+    <key name="toggle-zoom" type="as">
+      <default>['&lt;Control&gt;&lt;Alt&gt;z']</default>
+      <summary>Activar o desactivar el zoom</summary>
+      <description>Aceleradores de GTK, por ejemplo &lt;Control&gt;&lt;Alt&gt;z.</description>
+    </key>
+
+    <key name="zoom-in" type="as">
+      <default>['&lt;Super&gt;Up']</default>
+      <summary>Acercar</summary>
+      <description>Aceleradores de GTK, por ejemplo &lt;Super&gt;Up.</description>
+    </key>
+
+    <key name="zoom-out" type="as">
+      <default>['&lt;Super&gt;Down']</default>
+      <summary>Alejar</summary>
+      <description>Aceleradores de GTK, por ejemplo &lt;Super&gt;Down.</description>
+    </key>
+
+    <key name="factor-min" type="d">
+      <default>1.0</default>
+      <summary>Factor minimo</summary>
+      <description>1.0 muestra el monitor completo sin ampliar.</description>
+    </key>
+
+    <key name="factor-max" type="d">
+      <default>10.0</default>
+      <summary>Factor maximo</summary>
+    </key>
+
+    <key name="factor-step" type="d">
+      <default>0.5</default>
+      <summary>Paso de zoom</summary>
+      <description>Cuanto sube o baja el factor en cada pulsacion.</description>
+    </key>
+
+    <!-- Estado interno: mientras el zoom esta activo se apartan los atajos
+         de maximizar/restaurar de GNOME que choquen con acercar/alejar.
+         Si el shell muere con el zoom activo, enable() los restaura. -->
+    <key name="conflicts-suspended" type="b">
+      <default>false</default>
+      <summary>Atajos del WM apartados temporalmente</summary>
+    </key>
+
+    <key name="saved-maximize" type="as">
+      <default>[]</default>
+      <summary>Valor original de maximizar</summary>
+    </key>
+
+    <key name="saved-unmaximize" type="as">
+      <default>[]</default>
+      <summary>Valor original de restaurar</summary>
+    </key>
+
+  </schema>
+</schemalist>

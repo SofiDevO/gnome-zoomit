@@ -1,0 +1,8 @@
+{
+  "uuid": "zoomit-poc@sofidev",
+  "name": "gnome-zoomit",
+  "description": "Zoom en vivo con click-through y atajos configurables para GNOME Shell en Wayland.",
+  "shell-version": ["48"],
+  "settings-schema": "org.gnome.shell.extensions.zoomit",
+  "version": 3
+}
