@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (C) 2026 SofiDevO
+//
 // Matematica pura del zoom. Sin GTK, sin Clutter: testeable con node.
 
 export const FACTOR_MIN = 1.0;

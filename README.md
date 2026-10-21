@@ -1,137 +1,147 @@
 # gnome-zoomit
 
-Zoom en vivo con click-through para GNOME Shell en Wayland, inspirado en
-[ZoomIt](https://learn.microsoft.com/sysinternals/downloads/zoomit) de
+Live zoom with click-through for GNOME Shell on Wayland, inspired by
+[ZoomIt](https://learn.microsoft.com/sysinternals/downloads/zoomit) from
 Sysinternals.
 
-A diferencia de las herramientas que capturan la pantalla con PipeWire, esta
-extensión clona el árbol de actores del compositor. El resultado es zoom sobre
-contenido vivo: video, GIFs, animaciones y ventanas interactivas siguen
-funcionando, y los clics atraviesan el zoom hasta la ventana real.
+Unlike tools that capture the screen with PipeWire, this extension clones the
+compositor actor tree. The result is zooming over live content: video, GIFs,
+animations, and interactive windows continue to work, and clicks pass through
+the zoom to the real window.
 
-## Características
+## Features
 
-- Zoom en vivo con `Clutter.Clone` de `Main.uiGroup`.
-- Click-through: el puntero y los clics siguen llegando a la ventana de debajo.
-- Anclaje al puntero: el píxel bajo el cursor no se mueve.
-- Multi-monitor: la vista se recorta al monitor bajo el cursor.
-- Atajos configurables desde las preferencias de la extensión.
-- Rango de zoom configurable: 1x a 20x (10x por defecto).
-- Sin captura de pantalla, sin PipeWire y sin `ydotool`.
-- Compatible con video y GIFs en reproducción.
+- Live zoom using `Clutter.Clone` from `Main.uiGroup`.
+- Click-through: the pointer and clicks still reach the window underneath.
+- Pointer anchoring: the pixel under the cursor does not move.
+- Multi-monitor: the view is clipped to the monitor under the cursor.
+- Configurable shortcuts from the extension preferences.
+- Configurable zoom range: 1x to 20x (10x by default).
+- No screen capture, no PipeWire, and no `ydotool`.
+- Compatible with playing video and GIFs.
 
-## Requisitos
+## Requirements
 
-| Componente | Versión |
+| Component | Version |
 |---|---|
-| GNOME Shell | 48 (probado en 48.7) |
+| GNOME Shell | 48 (tested on 48.7) |
 | Mutter | 48 |
 | GJS | 1.82 |
-| Sesión | Wayland (recomendado) |
-| Distro | Debian 13 o cualquier distro con GNOME 48 |
+| Session | Wayland (recommended) |
+| Distro | Debian 13 or any distro with GNOME 48 |
 
-No se ha probado en GNOME 49 ni en X11.
+It has not been tested on GNOME 49 or X11.
 
-## Instalación
+## Installation
 
-### Instalación manual
+### Manual installation
 
 ```bash
-git clone https://github.com/TU_USUARIO/gnome-zoomit.git
+git clone https://github.com/SofiDevO/gnome-zoomit.git
 cd gnome-zoomit
 ```
 
-Sustituye `TU_USUARIO` por tu usuario de GitHub.
-
-Copia la extensión al directorio de extensiones de usuario. El nombre del
-directorio debe coincidir con el UUID `zoomit-poc@sofidev`:
+Copy the extension into the user extensions directory. The directory name must
+match the UUID exactly: `gnome-zoomit@SofiDevO`.
 
 ```bash
 mkdir -p ~/.local/share/gnome-shell/extensions
-cp -r extension ~/.local/share/gnome-shell/extensions/zoomit-poc@sofidev
-glib-compile-schemas ~/.local/share/gnome-shell/extensions/zoomit-poc@sofidev/schemas
+cp -r extension ~/.local/share/gnome-shell/extensions/gnome-zoomit@SofiDevO
+glib-compile-schemas ~/.local/share/gnome-shell/extensions/gnome-zoomit@SofiDevO/schemas
 ```
 
-Activa la extensión:
+Enable the extension:
 
 ```bash
-gnome-extensions enable zoomit-poc@sofidev
-gnome-extensions info zoomit-poc@sofidev
+gnome-extensions enable gnome-zoomit@SofiDevO
+gnome-extensions info gnome-zoomit@SofiDevO
 ```
 
-En Wayland, GNOME Shell solo descubre extensiones nuevas al iniciar sesión.
-Cierra sesión y vuelve a entrar. Después, la extensión aparece como
-`gnome-zoomit` en Extension Manager.
+On Wayland, GNOME Shell only discovers new extensions when you log in. Log out
+and back in. After that, the extension appears as `gnome-zoomit` in Extension
+Manager.
 
-El UUID `zoomit-poc@sofidev` se conserva para no romper instalaciones y
-preferencias existentes; el nombre visible es `gnome-zoomit`.
-
-### Instalación para desarrollo
-
-Para trabajar sobre el repositorio sin copiar archivos:
+Check that it is enabled:
 
 ```bash
-ln -sfn "$PWD/extension" ~/.local/share/gnome-shell/extensions/zoomit-poc@sofidev
+gnome-extensions list --enabled | grep gnome-zoomit
+```
+
+The UUID `gnome-zoomit@SofiDevO` identifies the extension and its preferences
+directory. If you change it in `extension/metadata.json`, you must also rename
+the installed directory; otherwise the extension and its settings will no longer
+be found.
+
+### Development installation
+
+To work on the repository without copying files:
+
+```bash
+rm -rf ~/.local/share/gnome-shell/extensions/gnome-zoomit@SofiDevO
+ln -sfn "$PWD/extension" ~/.local/share/gnome-shell/extensions/gnome-zoomit@SofiDevO
 glib-compile-schemas extension/schemas
 ```
 
-Cada cambio en `extension.js`, `prefs.js`, `metadata.json` o el esquema
-requiere cerrar sesión y volver a entrar. En Wayland no existe `Alt+F2` + `r`.
+The `rm -rf` prevents `ln` from creating the symlink inside a previous copy.
 
-## Uso
+Any change to `extension.js`, `prefs.js`, `metadata.json`, or the schema requires
+logging out and back in. On Wayland there is no `Alt+F2` + `r`.
 
-| Atajo | Acción |
+## Usage
+
+| Shortcut | Action |
 |---|---|
-| `Ctrl+Alt+Z` | Activar o desactivar el zoom |
-| `Super+Arriba` | Acercar |
-| `Super+Abajo` | Alejar |
+| `Ctrl+Alt+Z` | Toggle zoom on or off |
+| `Super+Up` | Zoom in |
+| `Super+Down` | Zoom out |
 
-`Super+Arriba` y `Super+Abajo` solo controlan el zoom mientras está activo.
-Cuando el zoom está desactivado conservan su función normal de maximizar y
-restaurar ventanas.
+`Super+Up` and `Super+Down` only control zoom while it is active. When zoom is
+disabled they keep their normal GNOME maximize and restore behavior.
 
-### Preferencias
+### Preferences
 
-Abre Extension Manager, busca `gnome-zoomit` y pulsa el engranaje. También:
+Open Extension Manager, search for `gnome-zoomit`, and click the gear icon.
+Alternatively:
 
 ```bash
-gnome-extensions prefs zoomit-poc@sofidev
+gnome-extensions prefs gnome-zoomit@SofiDevO
 ```
 
-Desde ahí puedes:
+From there you can:
 
-- Grabar nuevos atajos para activar, acercar y alejar.
-- Cambiar el factor mínimo, máximo y el paso.
-- Restablecer los atajos por defecto.
+- Record new shortcuts to activate, zoom in, and zoom out.
+- Change the minimum, maximum, and step factors.
+- Restore the default shortcuts.
 
-## Cómo funciona
+## How it works
 
-1. Se crea un `Clutter.Clone` de `Main.uiGroup`, que incluye
-   `global.window_group`: ventanas, video y animaciones.
-2. El clone se pinta dentro de un `St.Bin` recortado al monitor bajo el
-   puntero.
-3. `Shell.util_set_hidden_from_pick()` saca el actor del picking, así que los
-   clics atraviesan el zoom y llegan a la ventana real.
-4. Un fondo opaco evita que se vean sombras o bordes translúcidos del original.
-5. El zoom usa el puntero como punto fijo. Con escala `f`, monitor `m` y
-   puntero `p`, el desplazamiento es:
+1. A `Clutter.Clone` of `Main.uiGroup` is created, which includes
+   `global.window_group`: windows, video, and animations.
+2. The clone is painted inside an `St.Bin` clipped to the monitor under the
+   pointer.
+3. `Shell.util_set_hidden_from_pick()` removes the actor from picking, so clicks
+   pass through the zoom and reach the real window below.
+4. An opaque background prevents shadows or translucent edges from the original
+   from showing through.
+5. The zoom uses the pointer as the fixed point. With scale `f`, monitor `m`,
+   and pointer `p`, the offset is:
 
    ```text
    P = (p - m) - p * f
    ```
 
-   Así el píxel bajo el cursor no se mueve y la región visible nunca sale del
-   monitor.
-6. El puntero se sigue a 30 Hz con un umbral de 2 px para reducir trabajo.
-7. `Super+Arriba/Abajo` chocan con maximizar/restaurar de GNOME. Mientras el
-   zoom está activo, la extensión aparta temporalmente esos atajos del WM y
-   los restaura al desactivar. Si el shell termina de forma anormal, se
-   recuperan al arrancar.
+   This keeps the pixel under the cursor fixed, and the visible region never
+   leaves the monitor.
+6. The pointer is tracked at 30 Hz with a 2 px threshold to reduce work.
+7. `Super+Up/Down` conflicts with GNOME maximize/restore. While zoom is active,
+   the extension temporarily removes those shortcuts from the WM and restores
+   them when disabled. If the shell exits abnormally, they are restored on
+   startup.
 
-El mecanismo es el mismo que usa la lupa de accesibilidad de GNOME
+The mechanism is the same one used by GNOME's accessibility magnifier
 (`js/ui/magnifier.js`).
 
-## Estructura del proyecto
+## Project structure
 
 ```text
 gnome-zoomit/
@@ -142,81 +152,83 @@ gnome-zoomit/
 │   ├── prefs.js
 │   ├── zoom.js
 │   └── schemas/
-│       ├── org.gnome.shell.extensions.zoomit.gschema.xml
-│       └── gschemas.compiled
+│       └── org.gnome.shell.extensions.zoomit.gschema.xml
 └── tests/
     └── test-zoom.mjs
 ```
 
 ## Tests
 
-La matemática del zoom está aislada de GNOME y se prueba con Node:
+The zoom math is isolated from GNOME and is tested with Node:
 
 ```bash
 node tests/test-zoom.mjs
 ```
 
-Prueba en un shell anidado:
+Try it in a nested shell:
 
 ```bash
 ZOOMIT_AUTOSTART=1 dbus-run-session -- gnome-shell --nested --wayland
 ```
 
-La captura del shell anidado no está permitida por D-Bus; la comprobación
-visual de video, GIF y click-through se hace en sesión real.
+Capturing the nested shell is not allowed by D-Bus; visual verification of video,
+GIF, and click-through is done in a real session.
 
-## Empaquetado
+## Packaging
 
-Para generar un zip instalable:
+To generate an installable zip from the repo root:
 
 ```bash
-cd ~/lab/gnome-zoomit
+cd gnome-zoomit
 gnome-extensions pack extension --force --extra-source=zoom.js
 ```
 
-`gnome-extensions pack` no incluye automáticamente módulos JavaScript que no
-sean `extension.js` o `prefs.js`. `zoom.js` debe pasarse con
-`--extra-source=zoom.js`; si se omite, la extensión falla al importarlo.
+The zip is generated as `gnome-zoomit@SofiDevO.shell-extension.zip`.
 
-El zip incluye el XML del schema, pero no el `gschemas.compiled`. Al instalar,
-compila el schema si el instalador no lo hizo:
+`gnome-extensions pack` does not automatically include JavaScript modules other
+than `extension.js` or `prefs.js`. `zoom.js` must be passed with
+`--extra-source=zoom.js`; if omitted, the extension fails to import it.
+
+The zip includes the schema XML but not the compiled gschema artifact
+(`gschemas.compiled`, a local build artifact not versioned). When installing, compile
+the schema if the installer did not already do so:
 
 ```bash
 glib-compile-schemas \
-    ~/.local/share/gnome-shell/extensions/zoomit-poc@sofidev/schemas
+    ~/.local/share/gnome-shell/extensions/gnome-zoomit@SofiDevO/schemas
 ```
 
-## Limitaciones
+## Limitations
 
-- Sin pan libre: la vista sigue al puntero; no se puede desplazar de forma
-  independiente sin remapear la entrada del compositor.
-- Sin anotaciones todavía.
-- Sin cursor escalado: se usa el cursor real del compositor.
-- El clone repinta el escritorio a 30 Hz; en hardware modesto puede notarse.
-- Un atajo personalizado que choque con otro atajo de GNOME puede no disparar.
-- Probado solo en GNOME Shell 48 / Wayland.
+- No free panning: the view follows the pointer; it cannot be moved
+  independently without remapping compositor input.
+- No annotations yet.
+- No scaled cursor: the real compositor cursor is used.
+- The clone repaints the desktop at 30 Hz; on modest hardware it can be noticed.
+- A custom shortcut that conflicts with another GNOME shortcut may not trigger.
+- Tested only on GNOME Shell 48 / Wayland.
 
 ## Roadmap
 
-- [ ] Anotaciones con Cairo sobre `St.DrawingArea`.
-- [ ] Modo dibujo con actor reactivo.
-- [ ] Empaquetado para extensions.gnome.org y `.deb`.
-- [ ] Soporte para GNOME 49.
-- [ ] Pan independiente del puntero.
+- [ ] Cairo annotations on `St.DrawingArea`.
+- [ ] Drawing mode with reactive actor.
+- [ ] Packaging for extensions.gnome.org and `.deb`.
+- [ ] GNOME 49 support.
+- [ ] Independent panning from the pointer.
 
-## Estado
+## Status
 
-PoC funcional. Validado en GNOME Shell 48.7, Debian 13, Wayland y dos
-monitores. El zoom, el click-through y los atajos configurables están
-implementados; la validación visual final se hace en sesión real.
+Working PoC. Validated on GNOME Shell 48.7, Debian 13, Wayland, and dual
+monitors. Zoom, click-through, and configurable shortcuts are implemented; the
+final visual validation is done in a real session.
 
-## Créditos
+## Credits
 
-- Inspirado en [ZoomIt](https://learn.microsoft.com/sysinternals/downloads/zoomit)
-  de Sysinternals.
-- El mecanismo de clone y click-through sigue la lupa de accesibilidad de
-  GNOME (`js/ui/magnifier.js`).
+- Inspired by [ZoomIt](https://learn.microsoft.com/sysinternals/downloads/zoomit)
+  from Sysinternals.
+- The clone and click-through mechanism follows GNOME's accessibility magnifier
+  (`js/ui/magnifier.js`).
 
-## Licencia
+## License
 
-Pendiente de definir.
+GPL-2.0-or-later. See [LICENSE](LICENSE).

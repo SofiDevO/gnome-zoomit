@@ -1,22 +1,25 @@
-// gnome-zoomit v3 — zoom en vivo con click-through sobre GNOME Wayland.
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (C) 2026 SofiDevO
 //
-// Mecanismo (el mismo que usa la lupa de accesibilidad de GNOME):
-//   1. Clutter.Clone de Main.uiGroup (que contiene global.window_group).
-//   2. Shell.util_set_hidden_from_pick para que el actor no consuma clicks.
-//   3. El clone cubre el monitor entero, asi que oculta el original por
-//      oclusion. No se toca la opacidad de uiGroup: eso apagaria el otro
-//      monitor y provocaba parpadeos.
+// gnome-zoomit v3 — live zoom with click-through on GNOME Wayland.
 //
-// El zoom esta anclado al puntero y recortado al monitor bajo el cursor:
-// el contenido bajo el puntero siempre coincide con el pixel fisico, de modo
-// que los clicks caen donde deben sin remapear input.
+// Mechanism (the same one used by GNOME's accessibility magnifier):
+//   1. Clutter.Clone of Main.uiGroup (which contains global.window_group).
+//   2. Shell.util_set_hidden_from_pick so the actor does not consume clicks.
+//   3. The clone covers the entire monitor, hiding the original through
+//      occlusion. uiGroup opacity is left untouched: changing it would dim
+//      the other monitor and cause flickering.
 //
-// Atajos por defecto (configurables en las preferencias de la extension):
-//   Super+Arriba / Super+Abajo   acercar / alejar
-//   Ctrl+Alt+Z                   activar / desactivar
+// Zoom is anchored to the pointer and clipped to the monitor under the cursor:
+// the content under the pointer always matches the physical pixel, so clicks
+// land where expected without remapping input.
 //
-// Se registran con Main.wm.addKeybinding, que ademas de hacer el grab llama a
-// allowKeybinding y recarga el atajo solo cuando cambia el GSettings.
+// Default shortcuts (configurable in the extension preferences):
+//   Super+Up / Super+Down   zoom in / out
+//   Ctrl+Alt+Z              toggle
+//
+// They are registered with Main.wm.addKeybinding, which also grabs the key,
+// calls allowKeybinding, and reloads the shortcut only when GSettings changes.
 
 import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
@@ -34,8 +37,9 @@ import {cloneOffset, clampFactor} from './zoom.js';
 const FACTOR_DEFAULT = 2.0;
 const WATCH_MS = 33;
 const MOVE_THRESHOLD = 2;
+const AUTOSTART_DELAY_S = 3;
 
-export default class ZoomItPocExtension extends Extension {
+export default class ZoomitExtension extends Extension {
     enable() {
         this._active = false;
         this._factor = FACTOR_DEFAULT;
@@ -45,6 +49,7 @@ export default class ZoomItPocExtension extends Extension {
         this._clone = null;
         this._monitor = null;
         this._watch = null;
+        this._autostartId = 0;
         this._bindings = [];
         this._zoomBindings = [];
         this._lastX = 0;
@@ -55,27 +60,46 @@ export default class ZoomItPocExtension extends Extension {
             schema_id: 'org.gnome.desktop.wm.keybindings',
         });
 
-        // Si el shell murio con el zoom activo, devuelve a GNOME sus atajos
-        // de maximizar/restaurar antes de volver a apartarlos.
+        // If the shell exited while zoom was active, restore GNOME's
+        // maximize/restore shortcuts before suspending them again.
         this._restoreConflicts();
 
         this._bind('toggle-zoom', Meta.KeyBindingFlags.IGNORE_AUTOREPEAT,
             () => this._toggle(), this._bindings);
 
-        // Solo para pruebas en gnome-shell anidado.
+        // Only for tests in a nested gnome-shell.
         if (GLib.getenv('ZOOMIT_AUTOSTART')) {
-            GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 3, () => {
-                console.log('[zoomit] autostart');
-                this._toggle();
-                console.log(`[zoomit] activo=${this._active}`);
-                return GLib.SOURCE_REMOVE;
-            });
+            this._autostartId = GLib.timeout_add_seconds(
+                GLib.PRIORITY_DEFAULT, AUTOSTART_DELAY_S, () => {
+                    this._autostartId = 0;
+                    this._toggle();
+                    return GLib.SOURCE_REMOVE;
+                });
         }
+    }
+
+    disable() {
+        this._deactivate();
+
+        this._removeBindings(this._bindings);
+
+        if (this._autostartId) {
+            GLib.Source.remove(this._autostartId);
+            this._autostartId = 0;
+        }
+
+        this._wmSettings = null;
+        this._settings = null;
     }
 
     _bind(name, flags, handler, list) {
         const action = Main.wm.addKeybinding(
-            name, this._settings, flags, Shell.ActionMode.ALL, handler);
+            name, this._settings, flags, Shell.ActionMode.ALL, () => {
+                handler();
+                // Meta forwards the event to the focused window unless the
+                // handler reports it as consumed.
+                return true;
+            });
 
         if (action === Meta.KeyBindingAction.NONE)
             console.warn(`[zoomit] no se pudo registrar el atajo ${name}`);
@@ -83,10 +107,21 @@ export default class ZoomItPocExtension extends Extension {
         list.push(name);
     }
 
+    _removeBindings(list) {
+        for (const name of list)
+            Main.wm.removeKeybinding(name);
+        list.length = 0;
+    }
+
+    _setFactor(factor, min, max) {
+        this._factor = clampFactor(factor, min, max);
+        this._clone.set_scale(this._factor, this._factor);
+    }
+
     /**
-     * Acercar/alejar solo existen mientras el zoom esta activo. Asi
-     * Super+Arriba/Abajo no le roban a GNOME maximizar/restaurar cuando no
-     * se esta usando el zoom.
+    * Zoom-in/out shortcuts exist only while zoom is active. This way,
+    * Super+Up/Down do not take GNOME's maximize/restore actions when zoom
+    * is not in use.
      */
     _suspendConflicts() {
         if (this._settings.get_boolean('conflicts-suspended'))
@@ -144,7 +179,7 @@ export default class ZoomItPocExtension extends Extension {
             const [px, py] = global.get_pointer();
             this._monitor = this._monitorAt(px, py);
 
-            // Contenedor recortado al monitor.
+            // Container clipped to the monitor.
             this._view = new St.Bin({
                 clip_to_allocation: true,
                 reactive: false,
@@ -152,9 +187,9 @@ export default class ZoomItPocExtension extends Extension {
 
             this._root = new Clutter.Actor({clip_to_allocation: true});
 
-            // Fondo opaco: evita que se vea el original por pixels
-            // translucidos (sombras, esquinas redondeadas).
-            // Clutter.Color no es un constructor en GJS; se usa CSS.
+            // Opaque background: prevents the original from showing through
+            // translucent pixels (shadows, rounded corners).
+            // Clutter.Color is not a constructor in GJS; use CSS instead.
             this._bg = new St.Widget({style: 'background-color: black;'});
 
             this._clone = new Clutter.Clone({source: Main.uiGroup});
@@ -163,20 +198,19 @@ export default class ZoomItPocExtension extends Extension {
             this._root.add_child(this._clone);
             this._view.set_child(this._root);
 
-            // Al stage, nunca a uiGroup: si estuviera dentro, se clonaria
-            // a si mismo.
+            // Add to the stage, never to uiGroup: otherwise it would clone
+            // itself.
             global.stage.add_child(this._view);
 
-            // Click-through: fuera del picking.
+            // Click-through: exclude it from picking.
             Shell.util_set_hidden_from_pick(this._view, true);
 
             this._applyMonitor(this._monitor);
-            this._factor = clampFactor(this._factor, ...this._factorLimits());
-            this._clone.set_scale(this._factor, this._factor);
+            this._setFactor(this._factor, ...this._factorLimits());
             this._active = true;
 
-            // Super+Arriba/Abajo chocan con maximizar/restaurar de GNOME.
-            // Se apartan solo mientras el zoom esta activo.
+            // Super+Up/Down conflict with GNOME's maximize/restore actions.
+            // Suspend them only while zoom is active.
             this._suspendConflicts();
             this._bind('zoom-in', Meta.KeyBindingFlags.NONE,
                 () => this._zoom(1), this._zoomBindings);
@@ -203,12 +237,10 @@ export default class ZoomItPocExtension extends Extension {
     }
 
     _applyMonitor(monitor) {
-        const m = monitor;
-
-        this._view.set_position(m.x, m.y);
-        this._view.set_size(m.width, m.height);
-        this._root.set_size(m.width, m.height);
-        this._bg.set_size(m.width, m.height);
+        this._view.set_position(monitor.x, monitor.y);
+        this._view.set_size(monitor.width, monitor.height);
+        this._root.set_size(monitor.width, monitor.height);
+        this._bg.set_size(monitor.width, monitor.height);
     }
 
     _update(x, y, force = false) {
@@ -221,23 +253,23 @@ export default class ZoomItPocExtension extends Extension {
             this._applyMonitor(monitor);
         }
 
-        if (!force && x === this._lastX && y === this._lastY)
-            return;
-
         if (!force &&
             Math.abs(x - this._lastX) < MOVE_THRESHOLD &&
             Math.abs(y - this._lastY) < MOVE_THRESHOLD)
             return;
 
-        const m = this._monitor;
+        // Keep the pointer as a fixed point: the pixel under the cursor does
+        // not move, and the visible region stays within the monitor. See zoom.js.
+        const [min, max] = this._factorLimits();
+        const offset = cloneOffset(x, y, this._monitor, this._factor, min, max);
 
-        // Punto fijo en el puntero: el pixel bajo el cursor no se mueve y la
-        // region visible queda siempre dentro del monitor. Ver zoom.js.
-        const offset = cloneOffset(x, y, m, this._factor,
-            ...this._factorLimits());
+        // The limits may have changed through preferences while zooming.
+        // Keep scale in sync with the offset that was actually applied.
+        if (offset.factor !== this._factor)
+            this._setFactor(offset.factor, min, max);
 
-        // Traslacion (no posicion): mantiene la asignacion del clone intacta
-        // y evita que el culling lo descarte al desplazarlo.
+        // Use translation (not position): this keeps the clone's allocation
+        // intact and prevents culling from discarding it when moved.
         this._clone.set_translation(offset.x, offset.y, 0);
 
         this._lastX = x;
@@ -251,20 +283,14 @@ export default class ZoomItPocExtension extends Extension {
         const [min, max] = this._factorLimits();
         const step = this._settings.get_double('factor-step');
 
-        this._factor = clampFactor(this._factor + direction * step, min, max);
-
-        if (this._clone)
-            this._clone.set_scale(this._factor, this._factor);
-
+        this._setFactor(this._factor + direction * step, min, max);
         this._update(this._lastX, this._lastY, true);
     }
 
     _deactivate() {
         this._active = false;
 
-        for (const name of this._zoomBindings)
-            Main.wm.removeKeybinding(name);
-        this._zoomBindings = [];
+        this._removeBindings(this._zoomBindings);
 
         this._restoreConflicts();
 
@@ -282,16 +308,5 @@ export default class ZoomItPocExtension extends Extension {
         this._bg = null;
         this._clone = null;
         this._monitor = null;
-    }
-
-    disable() {
-        this._deactivate();
-
-        for (const name of this._bindings)
-            Main.wm.removeKeybinding(name);
-        this._bindings = [];
-
-        this._wmSettings = null;
-        this._settings = null;
     }
 }

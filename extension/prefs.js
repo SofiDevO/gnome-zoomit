@@ -1,5 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (C) 2026 SofiDevO
+//
 // Preferencias de gnome-zoomit. Se abren desde el icono de engranaje de
-// Extension Manager o con: gnome-extensions prefs zoomit-poc@sofidev
+// Extension Manager o con: gnome-extensions prefs gnome-zoomit@SofiDevO
 
 import Adw from 'gi://Adw';
 import Gdk from 'gi://Gdk';
@@ -36,7 +39,11 @@ const MODIFIER_KEYS = new Set([
     Gdk.KEY_Caps_Lock, Gdk.KEY_Num_Lock,
 ]);
 
-export default class ZoomItPreferences extends ExtensionPreferences {
+const REQUIRED_MODIFIERS = Gdk.ModifierType.CONTROL_MASK |
+    Gdk.ModifierType.ALT_MASK |
+    Gdk.ModifierType.SUPER_MASK;
+
+export default class ZoomitPreferences extends ExtensionPreferences {
     fillPreferencesWindow(window) {
         this._settings = this.getSettings();
         this._labels = new Map();
@@ -204,11 +211,8 @@ export default class ZoomItPreferences extends ExtensionPreferences {
                 return Gdk.EVENT_PROPAGATE;
 
             const mods = state & Gtk.accelerator_get_default_mod_mask();
-            const required = Gdk.ModifierType.CONTROL_MASK |
-                Gdk.ModifierType.ALT_MASK |
-                Gdk.ModifierType.SUPER_MASK;
 
-            if ((mods & required) === 0) {
+            if ((mods & REQUIRED_MODIFIERS) === 0) {
                 hint.set_label('Anade Ctrl, Alt o Super');
                 return Gdk.EVENT_STOP;
             }

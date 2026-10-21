@@ -1,0 +1,5 @@
+# Generated at install time by glib-compile-schemas
+extension/schemas/gschemas.compiled
+
+# Installable zip produced by gnome-extensions pack
+*.shell-extension.zip
