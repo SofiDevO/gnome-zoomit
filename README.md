@@ -13,7 +13,9 @@ the zoom to the real window.
 
 - Live zoom using `Clutter.Clone` from `Main.uiGroup`.
 - Click-through: the pointer and clicks still reach the window underneath.
-- Pointer anchoring: the pixel under the cursor does not move.
+- Pointer anchoring: the pixel under the cursor does not move, except near a
+  screen edge, where the view snaps to the edge so dock and panel icons stay
+  visible.
 - Multi-monitor: the view is clipped to the monitor under the cursor.
 - Configurable shortcuts from the extension preferences.
 - Configurable zoom range: 1x to 20x (10x by default).
@@ -50,6 +52,9 @@ cp -r extension ~/.local/share/gnome-shell/extensions/gnome-zoomit@SofiDevO
 glib-compile-schemas ~/.local/share/gnome-shell/extensions/gnome-zoomit@SofiDevO/schemas
 ```
 
+This creates a self-contained copy. The installed extension no longer depends on
+the repository: you can delete the clone later and it keeps working.
+
 Enable the extension:
 
 ```bash
@@ -72,7 +77,24 @@ directory. If you change it in `extension/metadata.json`, you must also rename
 the installed directory; otherwise the extension and its settings will no longer
 be found.
 
+### Updating an installed copy
+
+After pulling or writing fixes in the repository, deploy them to the installed
+copy:
+
+```bash
+rm -rf ~/.local/share/gnome-shell/extensions/gnome-zoomit@SofiDevO
+cp -r extension ~/.local/share/gnome-shell/extensions/gnome-zoomit@SofiDevO
+glib-compile-schemas ~/.local/share/gnome-shell/extensions/gnome-zoomit@SofiDevO/schemas
+```
+
+Log out and back in so GNOME Shell loads the new code. The repository can be
+removed afterwards without affecting the installed extension.
+
 ### Development installation
+
+Only for working on the code. This creates a symlink, so the installed extension
+depends on the repository: deleting or moving the checkout breaks it.
 
 To work on the repository without copying files:
 
@@ -83,6 +105,7 @@ glib-compile-schemas extension/schemas
 ```
 
 The `rm -rf` prevents `ln` from creating the symlink inside a previous copy.
+Do not use the symlink for a normal installation; use the copy above instead.
 
 Any change to `extension.js`, `prefs.js`, `metadata.json`, or the schema requires
 logging out and back in. On Wayland there is no `Alt+F2` + `r`.
@@ -132,6 +155,16 @@ From there you can:
 
    This keeps the pixel under the cursor fixed, and the visible region never
    leaves the monitor.
+
+   Close to an edge, that anchoring would crop exactly what you want to point
+   at: at 2x, with the cursor 50 px from the left edge, the view starts at
+   25 px and hides the first 25 px of the dock. The extension pins the view to
+   the edge in a band of `EDGE_DRIFT / (f - 1)` pixels (96 px at 2x) and blends
+   back to pointer anchoring over the next band, using `smoothstep` so there is
+   no jump. Inside the pinned band the view stands still and the cursor moves
+   over the magnified image; the offset between the cursor and the content
+   below it peaks at about 1.1 × `EDGE_DRIFT` (~105 px) and is zero at the exact
+   edge.
 6. The pointer is tracked at 30 Hz with a 2 px threshold to reduce work.
 7. `Super+Up/Down` conflicts with GNOME maximize/restore. While zoom is active,
    the extension temporarily removes those shortcuts from the WM and restores
@@ -203,7 +236,10 @@ glib-compile-schemas \
 - No free panning: the view follows the pointer; it cannot be moved
   independently without remapping compositor input.
 - No annotations yet.
-- No scaled cursor: the real compositor cursor is used.
+- No scaled cursor: the real compositor cursor is used. Inside the edge band
+  the cursor is over magnified content while clicks still land at the physical
+  pointer position, so a click near a screen edge can hit a different element
+  than the one under the cursor.
 - The clone repaints the desktop at 30 Hz; on modest hardware it can be noticed.
 - A custom shortcut that conflicts with another GNOME shortcut may not trigger.
 - Tested only on GNOME Shell 48 / Wayland.

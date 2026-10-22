@@ -11,8 +11,10 @@
 //      the other monitor and cause flickering.
 //
 // Zoom is anchored to the pointer and clipped to the monitor under the cursor:
-// the content under the pointer always matches the physical pixel, so clicks
-// land where expected without remapping input.
+// away from the edges, the content under the pointer matches the physical
+// pixel, so clicks land where expected without remapping input. Within
+// EDGE_DRIFT / (f - 1) px of an edge the view snaps to that edge so dock and
+// panel icons are not cropped.
 //
 // Default shortcuts (configurable in the extension preferences):
 //   Super+Up / Super+Down   zoom in / out
@@ -258,8 +260,9 @@ export default class ZoomitExtension extends Extension {
             Math.abs(y - this._lastY) < MOVE_THRESHOLD)
             return;
 
-        // Keep the pointer as a fixed point: the pixel under the cursor does
-        // not move, and the visible region stays within the monitor. See zoom.js.
+        // Keep the pointer as a fixed point away from the edges; near them the
+        // view snaps to the boundary so docks and panels stay visible. See
+        // zoom.js.
         const [min, max] = this._factorLimits();
         const offset = cloneOffset(x, y, this._monitor, this._factor, min, max);
 

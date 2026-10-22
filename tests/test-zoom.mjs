@@ -1,8 +1,8 @@
 // Tests de la matematica del zoom. Ejecutar: node tests/test-zoom.mjs
 import assert from 'node:assert/strict';
 
-import {cloneOffset, visibleRegion, clampFactor, FACTOR_MIN, FACTOR_MAX}
-    from '../extension/zoom.js';
+import {cloneOffset, visibleRegion, clampFactor, FACTOR_MIN, FACTOR_MAX,
+    EDGE_DRIFT} from '../extension/zoom.js';
 
 const LEFT = {x: 0, y: 0, width: 1366, height: 768};
 const RIGHT = {x: 1366, y: 0, width: 1920, height: 1080};
@@ -67,12 +67,13 @@ const EPS = 1e-6;
 }
 
 // Invariante del punto fijo y de la region contenida, para todo punto y
-// factor validos, en ambos monitores.
+// factor validos, en ambos monitores. Con drift 0 se desactiva la asistencia
+// de borde y se comprueba el anclaje puro al puntero.
 for (const m of [LEFT, RIGHT]) {
     for (const f of [1, 1.25, 1.5, 2, 3, 4, 6]) {
         for (let px = m.x; px <= m.x + m.width; px += 41) {
             for (let py = m.y; py <= m.y + m.height; py += 53) {
-                const o = cloneOffset(px, py, m, f);
+                const o = cloneOffset(px, py, m, f, FACTOR_MIN, FACTOR_MAX, 0);
                 const r = visibleRegion(o, m, f);
 
                 // El puntero no se mueve de su pixel.
@@ -90,6 +91,71 @@ for (const m of [LEFT, RIGHT]) {
                     `f=${f} py=${py}: fuga arriba`);
                 assert.ok(r.y + r.height <= m.y + m.height + EPS,
                     `f=${f} py=${py}: fuga abajo`);
+            }
+        }
+    }
+}
+
+// Asistencia de borde: con el puntero a 40 px del borde (2x), la vista se pega
+// al borde en vez de recortar los primeros ~100 px del escritorio.
+{
+    const f = 2;
+    const d = 40;
+    const left = visibleRegion(cloneOffset(LEFT.x + d, LEFT.y + d, LEFT, f), LEFT, f);
+    assert.ok(Math.abs(left.x - LEFT.x) < EPS, `borde izquierdo en ${left.x}`);
+    assert.ok(Math.abs(left.y - LEFT.y) < EPS, `borde superior en ${left.y}`);
+
+    const edgeX = RIGHT.x + RIGHT.width - d;
+    const edgeY = RIGHT.y + RIGHT.height - d;
+    const right = visibleRegion(cloneOffset(edgeX, edgeY, RIGHT, f), RIGHT, f);
+    assert.ok(Math.abs(right.x + right.width - (RIGHT.x + RIGHT.width)) < EPS);
+    assert.ok(Math.abs(right.y + right.height - (RIGHT.y + RIGHT.height)) < EPS);
+}
+
+// A 4x la zona de pegado es mas estrecha: 20 px siguen pegados al borde y
+// 200 px ya usan el anclaje normal.
+{
+    const f = 4;
+    const near = visibleRegion(cloneOffset(LEFT.x + 20, 384, LEFT, f), LEFT, f);
+    assert.ok(Math.abs(near.x - LEFT.x) < EPS);
+
+    const far = cloneOffset(LEFT.x + 200, 384, LEFT, f);
+    assert.ok(Math.abs(far.x + (LEFT.x + 200) * f - 200) < EPS);
+}
+
+// La transicion no tiene saltos: la vista se mueve menos de 4 px por cada px
+// que avanza el puntero.
+{
+    const f = 2;
+    let prev = visibleRegion(cloneOffset(LEFT.x, 384, LEFT, f), LEFT, f).x;
+    for (let d = 1; d <= 400; d++) {
+        const x = visibleRegion(cloneOffset(LEFT.x + d, 384, LEFT, f), LEFT, f).x;
+        assert.ok(Math.abs(x - prev) < 4, `salto de ${x - prev} px en d=${d}`);
+        prev = x;
+    }
+}
+
+// El desvio del puntero respecto al contenido queda en torno a EDGE_DRIFT
+// (con el suavizado, como maximo ~1.1 * EDGE_DRIFT).
+for (const f of [1.5, 2, 3, 4, 6, 10]) {
+    for (let d = 0; d <= 500; d++) {
+        const o = cloneOffset(LEFT.x + d, 384, LEFT, f);
+        const drift = Math.abs(o.x + (LEFT.x + d) * f - (LEFT.x + d));
+        assert.ok(drift <= EDGE_DRIFT * 1.1 + EPS,
+            `f=${f} d=${d}: desvio ${drift}`);
+    }
+}
+
+// Con la asistencia activa la vista sigue sin salir del monitor.
+for (const m of [LEFT, RIGHT]) {
+    for (const f of [1, 1.25, 1.5, 2, 3, 4, 6, 10]) {
+        for (let px = m.x; px <= m.x + m.width; px += 37) {
+            for (let py = m.y; py <= m.y + m.height; py += 47) {
+                const r = visibleRegion(cloneOffset(px, py, m, f), m, f);
+                assert.ok(r.x >= m.x - EPS, `fuga izquierda f=${f} px=${px}`);
+                assert.ok(r.x + r.width <= m.x + m.width + EPS);
+                assert.ok(r.y >= m.y - EPS, `fuga arriba f=${f} py=${py}`);
+                assert.ok(r.y + r.height <= m.y + m.height + EPS);
             }
         }
     }
